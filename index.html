@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>DEDSEC :: TERMINAL</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="crt-scan"></div>
+<div class="wrap">
+  <header>
+    <div class="brand">
+      <svg viewBox="0 0 100 100" fill="none">
+        <path d="M50 8 C25 8 12 26 12 48 C12 68 24 84 34 90 C34 78 30 70 30 62 C30 62 38 68 50 68 C62 68 70 62 70 62 C70 70 66 78 66 90 C76 84 88 68 88 48 C88 26 75 8 50 8 Z" stroke="#f2f2f2" stroke-width="3"/>
+        <circle cx="36" cy="46" r="6" fill="#f2f2f2"/>
+        <circle cx="64" cy="46" r="6" fill="#f2f2f2"/>
+      </svg>
+      <div>
+        <h1 class="glitch-text" data-text="DedSec // Terminal">DedSec // Terminal</h1>
+        <p>Donnees publiques reelles — version statique (GitHub Pages)</p>
+      </div>
+    </div>
+    <div class="hstat">
+      <div><span class="blinkdot"></span>heure locale<b id="clock">--:--:--</b></div>
+      <div>statut<b>EN LIGNE</b></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="panel">
+      <div class="panel-head">Menu</div>
+      <div class="panel-body">
+        <nav>
+          <ul id="navList">
+            <li class="active" data-target="profiler"><span class="n">01</span>Profileur</li>
+            <li data-target="reseau"><span class="n">02</span>Reseau elec.</li>
+            <li data-target="cameras"><span class="n">03</span>Cameras</li>
+            <li data-target="signal"><span class="n">04</span>Signal</li>
+            <li data-target="marches"><span class="n">05</span>Marches</li>
+            <li data-target="carte"><span class="n">06</span>Carte mondiale</li>
+            <li data-target="solaire"><span class="n">07</span>Activite solaire</li>
+          </ul>
+        </nav>
+        <button class="refresh-all" id="refreshAll">&#8635; tout actualiser</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head" id="mainHead">Profileur — avis de recherche publics<small>INTERPOL Notices API</small></div>
+      <div class="panel-body">
+
+        <div class="section active" id="sec-profiler">
+          <p class="hint">Avis publics et officiels publies par INTERPOL (avis rouges = recherches, avis jaunes = disparitions). Requete envoyee directement depuis votre navigateur ; certains navigateurs/reseaux peuvent bloquer l'appel (CORS) — un lien de secours s'affiche alors.</p>
+          <div class="tagrow">
+            <div class="tag active" data-type="red">Recherches (Red Notices)</div>
+            <div class="tag" data-type="yellow">Disparitions (Yellow Notices)</div>
+          </div>
+          <div class="search-row">
+            <input type="text" id="profNameFilter" placeholder="Filtrer par nom (optionnel)">
+            <input type="text" id="profCountryFilter" placeholder="Code pays (ex: FR, DE, IT)" value="FR" maxlength="2">
+            <button class="btn" id="profSearchBtn">Interroger</button>
+          </div>
+          <div id="profResults"></div>
+        </div>
+
+        <div class="section" id="sec-reseau">
+          <p class="hint">Mix electrique et consommation de la France en direct, source RTE — eco2mix (ODRE), rafraichi toutes les 15 minutes cote RTE.</p>
+          <button class="btn" id="reseauBtn">Charger l'etat du reseau</button>
+          <div id="reseauResults"></div>
+          <canvas id="reseauChart" height="90" style="margin-top:14px;"></canvas>
+        </div>
+
+        <div class="section" id="sec-cameras">
+          <p class="hint">Cameras routieres publiques et reellement en direct (reseau Digitraffic / Fintraffic — Finlande, Union europeenne), images rafraichies automatiquement toutes les ~10 minutes cote source.</p>
+          <button class="btn" id="camBtn">Charger les cameras en direct</button>
+          <div class="cam-grid" id="camGrid"></div>
+        </div>
+
+        <div class="section" id="sec-signal">
+          <p class="hint">Utilise le lien officiel <b>signal.me</b> de Signal pour ouvrir directement une conversation dans l'application.</p>
+          <div class="signal-form">
+            <input type="text" id="signalNumber" placeholder="+33 6 12 34 56 78">
+            <button class="btn" id="signalBtn">Ouvrir dans Signal</button>
+          </div>
+          <div id="signalOut" style="margin-top:12px; font-size:11px; color:var(--grey);"></div>
+        </div>
+
+        <div class="section" id="sec-marches">
+          <p class="hint">Acces reel a un compte bancaire prive impossible (donnee privee, non publique). A la place : taux de change de reference BCE, en direct, via l'API Frankfurter.</p>
+          <button class="btn" id="fxBtn">Charger les taux</button>
+          <div id="fxResults"></div>
+        </div>
+
+        <div class="section" id="sec-carte">
+          <p class="hint">Carte mondiale en direct — fond OpenStreetMap (Leaflet). Activez les couches pour superposer la position de l'ISS, le trafic aerien public (OpenSky), les seismes du jour (USGS) et la meteo mondiale (Open-Meteo). Certaines couches (OpenSky) sont soumises a des quotas publics et peuvent etre temporairement indisponibles.</p>
+          <div class="layer-toggles">
+            <label><input type="checkbox" id="layerIss" checked> 🛰️ ISS</label>
+            <label><input type="checkbox" id="layerFlights"> ✈️ Vols (OpenSky)</label>
+            <label><input type="checkbox" id="layerQuakes" checked> 🌊 Seismes (USGS)</label>
+            <label><input type="checkbox" id="layerWeather"> 🌦️ Meteo villes</label>
+            <label><input type="checkbox" id="layerCams"> 📹 Webcams</label>
+          </div>
+          <div id="mapContainer" class="map-container"></div>
+          <div id="mapStatus"></div>
+        </div>
+
+        <div class="section" id="sec-solaire">
+          <p class="hint">Activite solaire en direct — flux de rayons X du satellite GOES (NOAA / Space Weather Prediction Center).</p>
+          <button class="btn" id="solarBtn">Charger l'activite solaire</button>
+          <div id="solarResults"></div>
+          <canvas id="solarChart" height="90" style="margin-top:14px;"></canvas>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">Journal<small id="logCount">0 evenements</small></div>
+      <div class="console">
+        <div class="log" id="log"></div>
+        <div class="cursorline"><span class="blk"></span>root@dedsec:~$</div>
+      </div>
+    </div>
+  </div>
+
+  <footer>Version statique — sources : INTERPOL - RTE / ODRE - Frankfurter (BCE) - Digitraffic / Fintraffic - Signal - OpenStreetMap - Open-Notify/WhereTheISS - OpenSky Network - USGS - Open-Meteo - NOAA SWPC</footer>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<script src="script.js"></script>
+</body>
+</html>
