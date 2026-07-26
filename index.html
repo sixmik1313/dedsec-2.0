@@ -43,6 +43,7 @@
             <li data-target="marches"><span class="n">05</span>Marches</li>
             <li data-target="carte"><span class="n">06</span>Carte mondiale</li>
             <li data-target="solaire"><span class="n">07</span>Activite solaire</li>
+            <li data-target="satellite"><span class="n">08</span>Vue satellite</li>
           </ul>
         </nav>
         <button class="refresh-all" id="refreshAll">&#8635; tout actualiser</button>
@@ -78,6 +79,10 @@
           <p class="hint">Cameras routieres publiques et reellement en direct (reseau Digitraffic / Fintraffic — Finlande, Union europeenne), images rafraichies automatiquement toutes les ~10 minutes cote source.</p>
           <button class="btn" id="camBtn">Charger les cameras en direct</button>
           <div class="cam-grid" id="camGrid"></div>
+
+          <p class="hint" style="margin-top:22px;">Cameras de circulation publiques de New York (NYC DOT — NYCTMC), images en direct rafraichies en continu cote source.</p>
+          <button class="btn" id="camNycBtn">Charger les cameras de New York</button>
+          <div class="cam-grid" id="camGridNyc"></div>
         </div>
 
         <div class="section" id="sec-signal">
@@ -113,6 +118,24 @@
           <button class="btn" id="solarBtn">Charger l'activite solaire</button>
           <div id="solarResults"></div>
           <canvas id="solarChart" height="90" style="margin-top:14px;"></canvas>
+        </div>
+
+        <div class="section" id="sec-satellite">
+          <p class="hint">Images satellite reelles et en direct. Vue disque complet GOES-East / GOES-West (NOAA / NESDIS / STAR — mise a jour ~10 min), et photo quotidienne de la Terre entiere prise par la camera EPIC du satellite DSCOVR (NASA), depuis le point de Lagrange L1.</p>
+          <div class="sat-grid">
+            <div class="sat-card">
+              <div class="sat-label">GOES-19 — GOES-East (Ameriques / Atlantique)</div>
+              <img id="goesEastImg" alt="Disque complet GOES-East">
+            </div>
+            <div class="sat-card">
+              <div class="sat-label">GOES-18 — GOES-West (Pacifique)</div>
+              <img id="goesWestImg" alt="Disque complet GOES-West">
+            </div>
+          </div>
+          <button class="btn" id="goesBtn" style="margin-top:14px;">Actualiser les images GOES</button>
+          <p class="hint" style="margin-top:20px;">Photo de la Terre entiere — NASA EPIC / DSCOVR (mise a jour ~1 fois par jour).</p>
+          <button class="btn" id="epicBtn">Charger la photo EPIC / DSCOVR</button>
+          <div id="epicResults"></div>
         </div>
 
       </div>
