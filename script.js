@@ -37,8 +37,10 @@ const heads = {
   signal: ["Signal — ouverture directe", "signal.me"],
   marches: ["Marches — taux de change reels", "Frankfurter / BCE"],
   carte: ["Carte mondiale — donnees en direct", "Leaflet / OSM + ISS + OpenSky + USGS + Open-Meteo"],
-  solaire: ["Activite solaire", "NOAA SWPC — GOES rayons X"]
+  solaire: ["Activite solaire", "NOAA SWPC — GOES rayons X"],
+  satellite: ["Vue satellite — Terre en direct", "NOAA GOES-19/18 + NASA EPIC/DSCOVR"]
 };
+let satelliteOpened = false;
 document.querySelectorAll('#navList li').forEach(li=>{
   li.addEventListener('click', ()=>{
     document.querySelectorAll('#navList li').forEach(x=>x.classList.remove('active'));
@@ -51,6 +53,11 @@ document.querySelectorAll('#navList li').forEach(li=>{
     if(target === 'carte'){
       initMap();
       setTimeout(()=>{ if(map) map.invalidateSize(); }, 120);
+    }
+    if(target === 'satellite' && !satelliteOpened){
+      satelliteOpened = true;
+      loadGoesImages();
+      loadEpic();
     }
   });
 });
@@ -208,6 +215,36 @@ async function loadCameras(){
   }
 }
 document.getElementById('camBtn').addEventListener('click', loadCameras);
+
+/* ---------- CAMERAS (NYCTMC, New York DOT, images directes) ---------- */
+async function loadCamerasNyc(){
+  const grid = document.getElementById('camGridNyc');
+  grid.innerHTML = '<p class="hint"><span class="loading">chargement des cameras de New York...</span></p>';
+  log('Requete API NYCTMC (cameras trafic New York)...');
+  try{
+    const res = await fetch('https://webcams.nyctmc.org/api/cameras');
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : [];
+    const online = list.filter(c => c.isOnline === 'true' || c.isOnline === true).slice(0, 12);
+    log(`Cameras NYCTMC recues \u2014 ${online.length} flux en direct.`);
+    if(online.length === 0){
+      grid.innerHTML = '<p class="hint">Aucune camera en ligne actuellement cote NYCTMC.</p>';
+      return;
+    }
+    grid.innerHTML = online.map(c => `
+      <div class="cam-card">
+        <img src="${c.imageUrl}?t=${Date.now()}" alt="${c.name}" loading="lazy">
+        <div class="cam-name">${c.name}</div>
+        <div class="cam-src">${c.area || 'NYCTMC'} \u00b7 New York</div>
+      </div>
+    `).join('');
+  }catch(e){
+    log('Echec de la requete cameras NYCTMC : ' + e.message, true);
+    grid.innerHTML = `<div class="errbox">Impossible de charger les cameras de New York (${e.message}). Voir <a href="https://webcams.nyctmc.org/map" target="_blank" rel="noopener" style="color:var(--red)">webcams.nyctmc.org</a>.</div>`;
+  }
+}
+document.getElementById('camNycBtn').addEventListener('click', loadCamerasNyc);
 
 /* ---------- SIGNAL ---------- */
 document.getElementById('signalBtn').addEventListener('click', ()=>{
@@ -382,6 +419,8 @@ async function loadWeatherLayer(){
 
 async function loadCamsLayer(){
   camMapMarkers.forEach(m=>map.removeLayer(m)); camMapMarkers = [];
+  let count = 0;
+
   log('Requete API Digitraffic (webcams sur carte)...');
   try{
     const res = await fetch('https://tie.digitraffic.fi/api/weathercam/v1/stations', {
@@ -389,7 +428,6 @@ async function loadCamsLayer(){
     });
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const data = await res.json();
-    let count = 0;
     for(const f of (data.features || [])){
       if(count >= 25) break;
       const props = f.properties || {};
@@ -402,10 +440,27 @@ async function loadCamsLayer(){
       }).bindPopup(`<b>${props.name}</b><br><img src="https://weathercam.digitraffic.fi/${preset.presetId}.jpg?t=${Date.now()}" style="width:200px; filter:grayscale(1); margin-top:6px;">`);
       marker.addTo(map); camMapMarkers.push(marker); count++;
     }
-    log(`Webcams affichees sur la carte \u2014 ${count}.`);
   }catch(e){
-    log('Echec webcams (carte) : ' + e.message, true);
+    log('Echec webcams Digitraffic (carte) : ' + e.message, true);
   }
+
+  log('Requete API NYCTMC (webcams sur carte)...');
+  try{
+    const res = await fetch('https://webcams.nyctmc.org/api/cameras');
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    const list = (Array.isArray(data) ? data : []).filter(c => (c.isOnline === 'true' || c.isOnline === true) && c.latitude && c.longitude).slice(0, 25);
+    list.forEach(c=>{
+      const marker = L.marker([parseFloat(c.latitude), parseFloat(c.longitude)], {
+        icon: L.divIcon({ className:'map-emoji-icon', html:'\u{1F4F9}', iconSize:[20,20] })
+      }).bindPopup(`<b>${c.name}</b><br><img src="${c.imageUrl}?t=${Date.now()}" style="width:200px; margin-top:6px;">`);
+      marker.addTo(map); camMapMarkers.push(marker); count++;
+    });
+  }catch(e){
+    log('Echec webcams NYCTMC (carte) : ' + e.message, true);
+  }
+
+  log(`Webcams affichees sur la carte \u2014 ${count}.`);
 }
 
 /* ================= ACTIVITE SOLAIRE (NOAA SWPC) ================= */
@@ -462,11 +517,62 @@ function drawSolarChart(points){
 }
 document.getElementById('solarBtn').addEventListener('click', loadSolar);
 
+/* ================= VUE SATELLITE (GOES + NASA EPIC/DSCOVR) ================= */
+function imgFallback(imgEl, url, label){
+  const div = document.createElement('div');
+  div.className = 'errbox';
+  div.innerHTML = `Image ${label} indisponible pour le moment. Voir <a href="${url}" target="_blank" rel="noopener" style="color:var(--red)">star.nesdis.noaa.gov</a>.`;
+  if(imgEl.parentElement) imgEl.replaceWith(div);
+}
+function loadGoesImages(){
+  log('Requete images satellite GOES-19 (Est) / GOES-18 (Ouest) — NOAA STAR...');
+  const t = Date.now();
+  const east = document.getElementById('goesEastImg');
+  const west = document.getElementById('goesWestImg');
+  east.onerror = () => imgFallback(east, 'https://www.star.nesdis.noaa.gov/goes/fulldisk.php?sat=G19', 'GOES-East');
+  west.onerror = () => imgFallback(west, 'https://www.star.nesdis.noaa.gov/goes/fulldisk.php?sat=G18', 'GOES-West');
+  east.src = `https://cdn.star.nesdis.noaa.gov/GOES19/ABI/FD/GEOCOLOR/1808x1808.jpg?t=${t}`;
+  west.src = `https://cdn.star.nesdis.noaa.gov/GOES18/ABI/FD/GEOCOLOR/1808x1808.jpg?t=${t}`;
+  log('Images satellite GOES demandees (mises a jour cote NOAA toutes les ~10 min).');
+}
+document.getElementById('goesBtn').addEventListener('click', loadGoesImages);
+
+async function loadEpic(){
+  const box = document.getElementById('epicResults');
+  box.innerHTML = '<p class="hint"><span class="loading">chargement de la photo DSCOVR / EPIC...</span></p>';
+  log('Requete API NASA EPIC (epic.gsfc.nasa.gov)...');
+  try{
+    const res = await fetch('https://epic.gsfc.nasa.gov/api/natural');
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+    if(!Array.isArray(data) || data.length === 0) throw new Error('aucune image disponible');
+    const latest = data[data.length - 1];
+    const d = new Date(latest.date.replace(' ', 'T') + 'Z');
+    const yyyy = d.getUTCFullYear();
+    const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dd = String(d.getUTCDate()).padStart(2, '0');
+    const imgUrl = `https://epic.gsfc.nasa.gov/archive/natural/${yyyy}/${mm}/${dd}/jpg/${latest.image}.jpg`;
+    log('Photo EPIC recue \u2014 prise le ' + latest.date + ' UTC.');
+    box.innerHTML = `<div class="epic-card">
+      <img src="${imgUrl}" alt="Terre vue par la camera EPIC (satellite DSCOVR)" loading="lazy">
+      <div>
+        <div class="name">Terre entiere \u2014 camera EPIC (satellite DSCOVR)</div>
+        <div class="meta" style="margin-top:6px;">Prise le ${latest.date} UTC \u00b7 depuis le point de Lagrange L1 (\u2248 1,5 million km de la Terre)</div>
+      </div>
+    </div>`;
+  }catch(e){
+    log('Echec EPIC : ' + e.message, true);
+    box.innerHTML = `<div class="errbox">Impossible de charger la photo EPIC (${e.message}). Voir <a href="https://epic.gsfc.nasa.gov/" target="_blank" rel="noopener" style="color:var(--red)">epic.gsfc.nasa.gov</a>.</div>`;
+  }
+}
+document.getElementById('epicBtn').addEventListener('click', loadEpic);
+
 /* ---------- REFRESH ALL ---------- */
 document.getElementById('refreshAll').addEventListener('click', ()=>{
-  loadProfiler(); loadReseau(); loadFx(); loadCameras();
+  loadProfiler(); loadReseau(); loadFx(); loadCameras(); loadCamerasNyc();
   if(map){ loadISS(); loadQuakes(); }
   loadSolar();
+  if(satelliteOpened){ loadGoesImages(); loadEpic(); }
 });
 
 /* ---------- INIT ---------- */
